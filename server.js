@@ -1,26 +1,45 @@
 // بحطو عشان يقرأ ملف .env
 require("dotenv").config();
 
-// استيراد مكتبه express و pg
+// استيراد مكتبه express
 const express = require("express");
-const {Pool} = require("pg");
+//    {اتصال بال database, بحدد انواع الاعمده }
+const { Sequelize, DataTypes } = require("sequelize");
 
 const app = express();
 //  بقرأ الطلب يلي موجود بال body يلي ببعتو واذا كان json بحولو ل JS
 app.use(express.json());
 
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-})
+const sequelize = new Sequelize(process.env.DATABASE_URL, {
+  dialect: "postgres", // database type
+  logging: false, // عشان ما يطلعلي كل استعلامات ال database بال console
+});
 
-const COLUMNS = `id, title, description, completed, created_at AS "createdAt"`;
+const Task = sequelize.define(
+  "Task",
+  {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    title: { type: DataTypes.TEXT, allowNull: false },
+    description: { type: DataTypes.TEXT, defaultValue: "" },
+    completed: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+  },
+  {
+    tableName: "tasks",
+    underscored: true, // عشان يحول الاسماء من camelCase ل snake_case
+    updatedAt: false,
+  },
+);
 
 const validateId = (req, res, next) => {
-    const { id } = req.params;
-    if (!/^\d+$/.test(id) || Number(id) < 1 || Number(id) > 2147483647) {
-      return res.status(404).json({ error: "Task not found" });
-    }
-    next();
+  const { id } = req.params;
+  if (!/^\d+$/.test(id) || Number(id) < 1 || Number(id) > 2147483647) {
+    return res.status(404).json({ error: "Task not found" });
+  }
+  next();
 };
 
 app.get("/", (req, res) => {
@@ -43,23 +62,19 @@ app.post("/tasks", async (req, res) => {
     return res.status(400).json({ error: "Description must be a string." });
   }
   //++++++++++++++++++++++++++++++++++++++++++++
-    const { rows } = await pool.query(
-        `INSERT INTO tasks (title, description, completed)
-        VALUES ($1, $2, $3)
-        RETURNING ${COLUMNS}`,
-        [title.trim(), description ?? "", completed ?? false],
-    );
-    res.status(201).json(rows[0]);
+  const task = await Task.create({
+    title: title.trim(),
+    description: description ?? "",
+    completed: completed ?? false,
+  });
+  res.status(201).json(task);
 });
-
 
 app.get("/tasks", async (req, res) => {
   const { completed } = req.query;
-    if (completed === undefined) {
-        const { rows } = await pool.query(
-            `SELECT ${COLUMNS} FROM tasks ORDER BY id`,
-        );
-        return res.json(rows);
+  if (completed === undefined) {
+    const tasks = await Task.findAll({ order: [["id", "ASC"]] });
+    return res.json(tasks);
   }
   if (completed !== "true" && completed !== "false") {
     return res.status(400).json({
@@ -67,23 +82,19 @@ app.get("/tasks", async (req, res) => {
     });
   }
 
-    const { rows } = await pool.query(
-        `SELECT ${COLUMNS} FROM tasks WHERE completed = $1 ORDER BY id`,
-        [completed === "true"],
-    );
-  res.json(rows);
+  const tasks = await Task.findAll({
+    where: { completed: completed === "true" },
+    order: [["id", "ASC"]],
+  });
+  res.json(tasks);
 });
 
 app.get("/tasks/:id", validateId, async (req, res) => {
-
-    const { rows } = await pool.query(
-        `SELECT ${COLUMNS} FROM tasks WHERE id = $1`,
-        [req.params.id],
-    );
-    if (rows.length === 0) {
-        return res.status(404).json({ error: "Task not found" });
-    }
-    res.json(rows[0]);
+  const task = await Task.findByPk(req.params.id);
+  if (!task) {
+    return res.status(404).json({ error: "Task not found" });
+  }
+  res.json(task);
 });
 
 app.patch("/tasks/:id", validateId, async (req, res) => {
@@ -114,34 +125,23 @@ app.patch("/tasks/:id", validateId, async (req, res) => {
     });
   }
 
+  const task = await Task.findByPk(req.params.id);
+  if (!task) {
+    return res.status(404).json({ error: "Task not found" });
+  }
 
-    const { rows } = await pool.query(
-        `UPDATE tasks
-        SET title = COALESCE($1, title),
-            description = COALESCE($2, description),
-            completed = COALESCE($3, completed)
-        WHERE id = $4
-        RETURNING ${COLUMNS}`,
-        [
-            title !== undefined ? title.trim() : null,
-            description ?? null,
-            completed ?? null,
-            req.params.id,
-        ],
-    );
-    if (rows.length === 0) {
-        return res.status(404).json({ error: "Task not found" });
-    }   
-    res.json(rows[0]);
+  const updates = {};
+  if (title !== undefined) updates.title = title.trim();
+  if (description !== undefined) updates.description = description;
+  if (completed !== undefined) updates.completed = completed;
+
+  await task.update(updates);
+  res.json(task);
 });
 
-
 app.delete("/tasks/:id", validateId, async (req, res) => {
-    const result = await pool.query("DELETE FROM tasks WHERE id = $1 ", [
-        req.params.id,
-    ]);
-
-  if (result.rowCount === 0) {
+  const deleted = await Task.destroy({ where: { id: req.params.id } });
+  if (deleted === 0) {
     return res.status(404).json({ error: "Task not found" });
   }
 
@@ -163,35 +163,22 @@ app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ error: "Internal Server Error" });
 });
-/*
-const PORT = 3000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
-*/
+
 const PORT = process.env.PORT || 3000;
 
 async function start() {
-    try {
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS tasks (
-            id SERIAL PRIMARY KEY,
-            title Text NOT NULL,
-            description Text DEFAULT '',
-            completed BOOLEAN NOT NULL DEFAULT false,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )`
-        );
-        console.log("Connected to PostgreSQL");
-        app.listen(PORT, () => {
-            console.log(`Server is running on port ${PORT}`);
-        });
-    }
-    catch (err){
-        console.error("PostgreSQL connection error:", err.message);
-        // بطلع بسبب الخطأ
-        process.exit(1);
-    }
-};
+  try {
+    await sequelize.authenticate();
+    await Task.sync();
+    console.log("Connected to PostgreSQL");
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error("PostgreSQL connection error:", err.message);
+    // بطلع بسبب الخطأ
+    process.exit(1);
+  }
+}
 
 start();
