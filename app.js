@@ -1,5 +1,6 @@
 const express = require("express");
 const taskRoutes = require("./routes/taskRoutes");
+const userRoutes = require("./routes/userRoutes");
 
 const app = express();
 
@@ -10,7 +11,8 @@ app.get("/", (req, res) => {
   res.json({ status: "ok" });
 });
 
-app.use("/tasks", taskRoutes);
+app.use("/", taskRoutes);
+app.use("/", userRoutes);
 
 app.use((req, res) => {
   res

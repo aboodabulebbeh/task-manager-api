@@ -1,7 +1,12 @@
-const Task = require("../models/task");
+const { Task, User } = require("../models");
+
+const userInclude = { model: User, as: "user", attributes: ["id", "name"] };
 
 const createTask = async (req, res) => {
-  const { title, description, completed } = req.body ?? {};
+  const { title, description, completed, userId } = req.body ?? {};
+  if (!Number.isInteger(userId) || userId < 1 || userId > 2147483647) {
+    return res.status(400).json({ error: "UserId must be a valid integer" });
+  }
   if (typeof title !== "string" || title.trim() === "") {
     return res
       .status(400)
@@ -16,18 +21,38 @@ const createTask = async (req, res) => {
     return res.status(400).json({ error: "Description must be a string." });
   }
   //++++++++++++++++++++++++++++++++++++++++++++
+
+  const user = await User.findByPk(userId);
+  if (!user) {
+    return res.status(400).json({ error: "UserId does not exist" });
+  }
+
   const task = await Task.create({
     title: title.trim(),
     description: description ?? "",
     completed: completed ?? false,
+    userId,
   });
   res.status(201).json(task);
+};
+
+const listUserTask = async (req, res) => {
+  const user = await User.findByPk(req.params.id);
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  const tasks = await user.getTasks({ order: [["id", "ASC"]] });
+  res.json(tasks);
 };
 
 const listTasks = async (req, res) => {
   const { completed } = req.query;
   if (completed === undefined) {
-    const tasks = await Task.findAll({ order: [["id", "ASC"]] });
+    const tasks = await Task.findAll({
+      include: userInclude,
+      order: [["id", "ASC"]],
+    });
     return res.json(tasks);
   }
   if (completed !== "true" && completed !== "false") {
@@ -38,13 +63,14 @@ const listTasks = async (req, res) => {
 
   const tasks = await Task.findAll({
     where: { completed: completed === "true" },
+    include: userInclude,
     order: [["id", "ASC"]],
   });
   res.json(tasks);
 };
 
 const getTaskById = async (req, res) => {
-  const task = await Task.findByPk(req.params.id);
+  const task = await Task.findByPk(req.params.id, { include: userInclude });
   if (!task) {
     return res.status(404).json({ error: "Task not found" });
   }
@@ -101,4 +127,11 @@ const deleteTask = async (req, res) => {
   res.status(204).send();
 };
 
-module.exports = { createTask, listTasks, getTaskById, updateTask, deleteTask };
+module.exports = {
+  createTask,
+  listTasks,
+  getTaskById,
+  updateTask,
+  deleteTask,
+  listUserTask,
+};
