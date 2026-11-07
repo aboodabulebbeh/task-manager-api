@@ -6,14 +6,16 @@ const {
   getTaskById,
   updateTask,
   deleteTask,
-  listUserTask,
 } = require("../controllers/taskController");
+
+const { authenticate } = require("../middleware/auth");
 
 const router = express.Router();
 
+router.use("/tasks", authenticate); // Apply authentication middleware to all task routes
+
 router.post("/tasks", createTask);
 router.get("/tasks", listTasks);
-router.get("/users/:id/tasks", validateId("User"), listUserTask);
 router.get("/tasks/:id", validateId("Task"), getTaskById);
 router.patch("/tasks/:id", validateId("Task"), updateTask);
 router.delete("/tasks/:id", validateId("Task"), deleteTask);

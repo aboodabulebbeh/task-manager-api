@@ -1,6 +1,7 @@
 const express = require("express");
 const taskRoutes = require("./routes/taskRoutes");
 const userRoutes = require("./routes/userRoutes");
+const authRoutes = require("./routes/authRoutes");
 
 const app = express();
 
@@ -13,6 +14,7 @@ app.get("/", (req, res) => {
 
 app.use("/", taskRoutes);
 app.use("/", userRoutes);
+app.use("/", authRoutes);
 
 app.use((req, res) => {
   res
