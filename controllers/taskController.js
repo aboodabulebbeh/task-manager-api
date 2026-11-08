@@ -1,4 +1,23 @@
 const { Task, User } = require("../models");
+const redis = require("../config/redis");
+
+const CACHE_TTL = 600;
+
+//this is a name and format for redis
+const cacheKey = (userId, completed) =>
+  `tasks:user:${userId}:${completed ?? "all"}`;
+
+const invalidateTasksCache = async (userId) => {
+  try {
+    await redis.del(
+      cacheKey(userId),
+      cacheKey(userId, "true"),
+      cacheKey(userId, "false"),
+    );
+  } catch (err) {
+    console.error("Redis del failed: ", err.message);
+  }
+};
 
 // is this user allowed to access this task ?
 const canAccess = (task, user) =>
@@ -30,6 +49,7 @@ const createTask = async (req, res) => {
     completed: completed ?? false,
     userId: req.user.id, // from the authenticated user, not from the request body
   });
+  await invalidateTasksCache(req.user.id);
   res.status(201).json(task);
 };
 
@@ -45,11 +65,30 @@ const listTasks = async (req, res) => {
     where.completed = completed === "true";
   }
 
+  const useCache = req.user.roles !== "admin";
+  const key = cacheKey(req.user.id, completed);
+
+  if (useCache) {
+    try {
+      const cached = await redis.get(key);
+      if (cached) return res.json(JSON.parse(cached)); //JSON.parse(cached): We convert the text into an array.
+    } catch (err) {
+      console.error("Redis get failed:", err.message);
+    }
+  }
   const tasks = await Task.findAll({
     where,
     include: userInclude, // include user details in the response
     order: [["id", "ASC"]],
   });
+
+  if (useCache) {
+    try {
+      await redis.set(key, JSON.stringify(tasks), "EX", CACHE_TTL); // JSON.Stringfy :A function that converts any JavaScript object or array into text.
+    } catch (err) {
+      console.error("Redis set failed:", err.message);
+    }
+  }
   res.json(tasks);
 };
 
@@ -99,6 +138,7 @@ const updateTask = async (req, res) => {
   if (completed !== undefined) task.completed = completed;
 
   await task.save();
+  await invalidateTasksCache(task.userId);
   res.json(task);
 };
 
@@ -116,6 +156,7 @@ const deleteTask = async (req, res) => {
   }
 
   await task.destroy(); // to delete the task from the database
+  await invalidateTasksCache(task.userId);
   res.status(204).send(); // 204 No Content indicates that the request was successful but there is no content to send in the response
 };
 
