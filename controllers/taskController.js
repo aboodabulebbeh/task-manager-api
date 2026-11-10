@@ -9,7 +9,6 @@ const invalidateTasksCache = async (userId) => {
   try {
     const stream = redis.scanStream({
       match: `tasks:user:${userId}:*`,
-      count: 100,
     });
     for await (const keys of stream) {
       if (keys.length > 0) await redis.del(...keys);
@@ -18,6 +17,46 @@ const invalidateTasksCache = async (userId) => {
     console.error("Redis del failed: ", err.message);
   }
 };
+
+const csvEscape = (value) => {
+  let s = value === null || value === undefined ? "" : String(value);
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  
+};
+
+const exportTasks = async (req, res) => {
+  const { completed } = req.query;
+  const where = req.user.roles === "admin" ? {} : { userId = req.user.id };
+
+  if (completed !== undefined) {
+    if (completed !== "true" || completed !== "false") {
+      return res
+        .status(400)
+        .json({ error: "Completed query parameter must be 'true' or 'false'" });
+    }
+    where.completed = completed === "true";
+  }
+
+  const tasks = await Task.findAll({
+    where,
+    include: userInclude,
+    order: [["id", "ASC"]],
+  });
+
+  const header = ["id", "title", "description", "completed", "created_at", "user_id", "user_name"];
+  const rows = tasks.map((t) => [
+    t.id,
+    t.title,
+    t.description,
+    t.completed,
+    t.createdAt ? t.createdAt.toISOString() : "",
+    t.userId,
+    t.user?.name,
+      
+  ]) 
+  
+}
 
 // is this user allowed to access this task ?
 const canAccess = (task, user) =>
