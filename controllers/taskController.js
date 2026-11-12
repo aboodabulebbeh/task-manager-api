@@ -22,7 +22,7 @@ const invalidateTasksCache = async (userId) => {
 
 // Define the userInclude object to include user details in task queries
 const userInclude = { model: User, as: "user", attributes: ["id", "name"] };
-
+/*
 const exportTasks = async (req, res) => {
   const { completed } = req.query;
   const where = req.user.roles === "admin" ? {} : { userId: req.user.id };
@@ -93,6 +93,7 @@ const exportTasks = async (req, res) => {
   }
 };
 
+*/
 // is this user allowed to access this task ?
 const canAccess = (task, user) =>
   user.roles === "admin" || task.userId === user.id;
@@ -264,5 +265,4 @@ module.exports = {
   getTaskById,
   updateTask,
   deleteTask,
-  exportTasks,
 };

@@ -6,7 +6,7 @@ const {
   getTaskById,
   updateTask,
   deleteTask,
-  exportTasks,
+  //exportTasks,
 } = require("../controllers/taskController");
 
 const {
@@ -23,7 +23,7 @@ router.use("/tasks", authenticate); // Apply authentication middleware to all ta
 
 router.post("/tasks", createTask);
 router.get("/tasks", listTasks);
-router.get("/tasks/export", exportTasks);
+//router.get("/tasks/export", exportTasks);
 router.post("/tasks/export", startExport);
 router.get("/tasks/export/:jobId", exportStatus);
 router.get("/tasks/export/:jobId/download", downloadExport);
