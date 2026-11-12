@@ -2,6 +2,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { User } = require("../models");
 
+// to create JWT
 const signToken = (user) =>
   jwt.sign({ roles: user.roles }, process.env.JWT_SECRET, {
     subject: String(user.id),
