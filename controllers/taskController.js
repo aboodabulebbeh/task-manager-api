@@ -171,13 +171,6 @@ const updateTask = async (req, res) => {
 };
 
 const deleteTask = async (req, res) => {
-  /*
-  const deleted = await Task.destroy({ where: { id: req.params.id } }); ser destoy method returns the number of rows deleted (0 if none were deleted)
-  if (deleted === 0) {
-    return res.status(404).json({ error: "Task not found" });
-  }
-
-  res.status(204).send();*/
   const task = await Task.findByPk(req.params.id);
   if (!task || !canAccess(task, req.user)) {
     return res.status(404).json({ error: "Task not found" });
