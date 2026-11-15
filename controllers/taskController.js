@@ -22,78 +22,7 @@ const invalidateTasksCache = async (userId) => {
 
 // Define the userInclude object to include user details in task queries
 const userInclude = { model: User, as: "user", attributes: ["id", "name"] };
-/*
-const exportTasks = async (req, res) => {
-  const { completed } = req.query;
-  const where = req.user.roles === "admin" ? {} : { userId: req.user.id };
 
-  if (completed !== undefined) {
-    if (completed !== "true" && completed !== "false") {
-      return res
-        .status(400)
-        .json({ error: "Completed query parameter must be 'true' or 'false'" });
-    }
-    where.completed = completed === "true";
-  }
-
-  res.setHeader("Content-Type", "text/csv; charset=utf-8");
-  res.setHeader("Content-Disposition", 'attachment; filename="tasks.csv"');
-
-  const header = [
-    "id",
-    "title",
-    "description",
-    "completed",
-    "created_at",
-    "user_id",
-    "user_name",
-  ];
-  res.write("\uFEFF" + header.map(csvEscape).join(",") + "\r\n");
-
-  const BATCH = 2000;
-  let lastId = 0;
-
-  try {
-    while (true) {
-      const tasks = await Task.findAll({
-        where: { ...where, id: { [Op.gt]: lastId } },
-        include: userInclude,
-        order: [["id", "ASC"]],
-        limit: BATCH,
-      });
-      if (tasks.length === 0) break;
-
-      const chunk = tasks
-        .map((t) =>
-          [
-            t.id,
-            t.title,
-            t.description,
-            t.completed,
-            t.createdAt ? t.createdAt.toISOString() : "",
-            t.userId,
-            t.user?.name,
-          ]
-            .map(csvEscape)
-            .join(","),
-        )
-        .join("\r\n");
-
-      if (!res.write(chunk + "\r\n")) {
-        await new Promise((resolve) => res.once("drain", resolve));
-      }
-
-      lastId = tasks[tasks.length - 1].id;
-      if (tasks.length < BATCH) break;
-    }
-    res.end();
-  } catch (err) {
-    console.error("Export failed:", err.message);
-    res.destroy(err);
-  }
-};
-
-*/
 // is this user allowed to access this task ?
 const canAccess = (task, user) =>
   user.roles === "admin" || task.userId === user.id;

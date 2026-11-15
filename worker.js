@@ -1,5 +1,8 @@
 require("dotenv").config();
 
+const sequelize = require("./config/database");
+sequelize.authenticate().then(() => console.log("Worker DB connected"));
+
 const { Worker } = require("bullmq");
 const fs = require("fs");
 const path = require("path");

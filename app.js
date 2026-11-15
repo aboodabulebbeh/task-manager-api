@@ -3,6 +3,8 @@ const taskRoutes = require("./routes/taskRoutes");
 const userRoutes = require("./routes/userRoutes");
 const authRoutes = require("./routes/authRoutes");
 
+const bullBoard = require("./config/bullBoard");
+
 const app = express();
 
 // Middleware to parse JSON request bodies
@@ -11,6 +13,8 @@ app.use(express.json());
 app.get("/", (req, res) => {
   res.json({ status: "ok" });
 });
+
+app.use(bullBoard.BASE_PATH, bullBoard.basicAuth, bullBoard.router);
 
 app.use("/", taskRoutes);
 app.use("/", userRoutes);
